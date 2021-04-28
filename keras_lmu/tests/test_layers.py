@@ -423,3 +423,49 @@ def test_fit(fft):
         assert isinstance(lmu_layer.layer, tf.keras.layers.RNN)
 
     assert acc == 1.0
+
+def test_multidimensional_lmufft(rng):
+    # Test if LMUFFT with memory_d > 1 works the same way as multi-dimensional LMUCell 
+    memory_d = 4
+    order = 16
+    n_steps = 10 
+    input_d = 8
+
+   
+    inp = tf.keras.Input(shape=(n_steps, input_d))
+    
+    lmu_cell = tf.keras.layers.RNN(
+                layers.LMUCell(
+                memory_d=memory_d,
+                order=order,
+                theta=n_steps,
+                hidden_cell=None,
+                input_to_hidden=False,
+                hidden_to_memory=False,
+                memory_to_memory=False,
+                kernel_initializer="ones",
+                dropout=0,
+                trainable=False,
+            ),
+            return_sequences=True,
+        )(inp)
+    
+    lmu_fft =  layers.LMUFFT(
+                memory_d=memory_d,
+                order=order,
+                theta=n_steps,
+                hidden_cell=None,
+                input_to_hidden=False,                
+                kernel_initializer="ones",
+                dropout=0,
+                trainable=False,
+                return_sequences=True,
+            )(inp) 
+
+    model = tf.keras.Model(inp, [lmu_cell, lmu_fft])
+
+    results = model.predict(rng.uniform(0, 1, size=(1, n_steps, input_d)))
+
+    assert np.allclose(
+            results[0], results[1], atol=1e-4
+        )

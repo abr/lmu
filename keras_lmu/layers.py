@@ -397,8 +397,7 @@ class LMU(tf.keras.layers.Layer):
 
         if (
             not self.hidden_to_memory
-            and not self.memory_to_memory
-            and self.memory_d == 1
+            and not self.memory_to_memory            
             and input_shapes[1] is not None
         ):
             self.layer = LMUFFT(
@@ -568,10 +567,8 @@ class LMUFFT(tf.keras.layers.Layer):
         with some additional bookkeeping.
         """
 
-        super().build(input_shape)
+        super().build(input_shape)       
         
-        self.input_dim = input_shape[2]
-
         if input_shape[1] is None:
             # TODO: we could dynamically run the impulse response for longer if
             #  needed using stateful=True
@@ -623,6 +620,8 @@ class LMUFFT(tf.keras.layers.Layer):
 
         # Apply input encoders
         u = tf.matmul(inputs, self.kernel, name="input_encoder_mult")
+        
+        input_dim = tf.shape(u)[2]
         # FFT requires shape (batch, 1, timesteps)
         u = tf.transpose(u, perm=[0, 2, 1])
 
@@ -640,7 +639,7 @@ class LMUFFT(tf.keras.layers.Layer):
         m = tf.signal.irfft(result, fft_length=[2 * seq_len])[..., :seq_len]
         
         # Reshaping
-        m = tf.reshape(m, (-1, self.order * self.input_dim, seq_len))
+        m = tf.reshape(m, (-1, self.order * input_dim, seq_len))
 
         m = tf.transpose(m, perm=[0, 2, 1])
 
