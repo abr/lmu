@@ -621,7 +621,6 @@ class LMUFFT(tf.keras.layers.Layer):
         # Apply input encoders
         u = tf.matmul(inputs, self.kernel, name="input_encoder_mult")
         
-        input_dim = tf.shape(u)[2]
         # FFT requires shape (batch, 1, timesteps)
         u = tf.transpose(u, perm=[0, 2, 1])
 
@@ -639,7 +638,7 @@ class LMUFFT(tf.keras.layers.Layer):
         m = tf.signal.irfft(result, fft_length=[2 * seq_len])[..., :seq_len]
         
         # Reshaping
-        m = tf.reshape(m, (-1, self.order * input_dim, seq_len))
+        m = tf.reshape(m, (-1, self.order * self.memory_d, seq_len))
 
         m = tf.transpose(m, perm=[0, 2, 1])
 
