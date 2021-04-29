@@ -397,8 +397,7 @@ class LMU(tf.keras.layers.Layer):
 
         if (
             not self.hidden_to_memory
-            and not self.memory_to_memory
-            and self.memory_d == 1
+            and not self.memory_to_memory            
             and input_shapes[1] is not None
         ):
             self.layer = LMUFFT(
@@ -529,13 +528,6 @@ class LMUFFT(tf.keras.layers.Layer):
     ):
         super().__init__(**kwargs)
 
-        if memory_d != 1:
-            # TODO: we can support this by reusing the same impulse response
-            #  for each dimension
-            raise NotImplementedError(
-                "Multi-dimensional memory not supported in LMUFFT"
-            )
-
         if input_to_hidden and hidden_cell is None:
             raise ValueError("input_to_hidden must be False if hidden_cell is None")
 
@@ -550,7 +542,7 @@ class LMUFFT(tf.keras.layers.Layer):
 
         self.delay_layer = tf.keras.layers.RNN(
             LMUCell(
-                memory_d=memory_d,
+                memory_d=1,
                 order=order,
                 theta=theta,
                 hidden_cell=None,
@@ -575,8 +567,8 @@ class LMUFFT(tf.keras.layers.Layer):
         with some additional bookkeeping.
         """
 
-        super().build(input_shape)
-
+        super().build(input_shape)       
+        
         if input_shape[1] is None:
             # TODO: we could dynamically run the impulse response for longer if
             #  needed using stateful=True
@@ -628,18 +620,25 @@ class LMUFFT(tf.keras.layers.Layer):
 
         # Apply input encoders
         u = tf.matmul(inputs, self.kernel, name="input_encoder_mult")
+        
         # FFT requires shape (batch, 1, timesteps)
         u = tf.transpose(u, perm=[0, 2, 1])
 
         # Pad sequences to avoid circular convolution
         # Perform the FFT
         fft_input = tf.signal.rfft(u, fft_length=[2 * seq_len], name="input_pad")
+        
+        # Expand dimensions
+        fft_input = tf.expand_dims(fft_input, axis=-2)
 
         # Elementwise product of FFT (broadcasting done automatically)
         result = fft_input * self.impulse_response
 
         # Inverse FFT
         m = tf.signal.irfft(result, fft_length=[2 * seq_len])[..., :seq_len]
+        
+        # Reshaping
+        m = tf.reshape(m, (-1, self.order * self.memory_d, seq_len))
 
         m = tf.transpose(m, perm=[0, 2, 1])
 
